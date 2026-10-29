@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openmods.nexus/openmods.schema.json",
+  "openmods": 1,
+  "name": "Witch Time",
+  "summary": "Dodge through an enemy attack or parry it at the right moment, and the world slows to 30% for one second while you keep full speed.",
+  "games": ["phantom-blade-zero"],
+  "tags": ["gameplay"],
+  "requires": ["UE4SS (tested with v3.0.1-1183-gcdbc0b66)"],
+  "gameVersions": ["Release (Steam build 26266538)"],
+  "cover": "docs/cover.png"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Witch Time",
+  "folder": "phantombladezero_witchtime",
+  "author": "Kintaro",
+  "version": "1.7",
+  "description": "A dodge through an enemy attack, or a timed parry, slows the whole world down for a moment, like Witch Time.",
+  "kind": "ue4ss",
+  "game": "phantombladezero",
+  "gameFolder": "PBZ",
+  "win64Path": "platform\\steam",
+  "gameVersion": "CL-301524_JKS-17219",
+  "engine": "UE5_7",
+  "ue4ss": "v3.0.1-1183-gcdbc0b66"
+}
