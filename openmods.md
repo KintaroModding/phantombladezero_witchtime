@@ -70,7 +70,8 @@ a value, save, and start the game again. `UE4SS.log` shows the settings in use i
 
 ## Known issues
 
-None yet.
+- Fixed in 1.8: versions up to 1.7 could crash the game now and then (their timer ran on a second thread). Please
+  update to 1.8.
 
 ## How to build
 

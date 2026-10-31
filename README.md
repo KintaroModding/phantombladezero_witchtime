@@ -33,10 +33,18 @@ how to install it are in [openmods.md](openmods.md), the mod page on [openmods](
   world; only replays use it otherwise. Not `TimeDilation` (`SetGlobalTimeDilation`): the game sets that back to 1.0
   every frame (seen in the test of 1.2), and its own short world slow-downs (`GAAction_GlobalSlomo_C`, for example
   x0.33 for about 0.46 s of real time on the red-light perfect dodge) go there, so they multiply with Witch Time. A
-  loop every 16 ms (only while a Witch Time runs) ends it after `DurationSeconds` of real time (`os.clock`) and sets
-  the factor back to 1.0, but only when it still has the mod's value; while it runs, the loop sets the factor again
-  when something changed it. A safety check in the 2-second loop ends a Witch Time that the 16 ms loop missed; a map
-  load drops it (the new map runs at full speed).
+  step once per frame (only while a Witch Time runs) ends it after `DurationSeconds` of real time (`os.clock`) and
+  sets the factor back to 1.0, but only when it still has the mod's value; while it runs, the step sets the factor
+  again when something changed it. A safety check in the 2-second loop ends a Witch Time that the frame step missed;
+  a map load drops it (the new map runs at full speed).
+- **Loops (1.8):** both loops run on the game thread, the same thread as the hooks, through UE4SS's Delayed Action
+  API: `LoopInGameThreadWithDelay(2000)` for the check and `LoopInGameThreadAfterFrames(1)` for the frame step (every
+  16 ms with `LoopInGameThreadWithDelay` when UE4SS has no engine tick hook, `EngineTickAvailable`). 1.7 used
+  `LoopAsync`, whose callback runs on a second thread in the same Lua state as the hooks; a player's crash report
+  showed a damaged state (`attempt to compare number with function` on a line that compares two numbers, then
+  UE4SS's `Ref was not function`). A UE4SS without the Delayed Action API keeps the old `LoopAsync` loops, and the log
+  says so. Game test of 1.8: five Witch Times ended after 1.007 to 1.008 s (planned 1.00 s), a chained one after
+  0.508 s (planned 0.50 s).
 - **Chain:** a dodge or parry within `ChainWindowSeconds` after the end starts a Witch Time of `ChainFactor` times the
   last length (dodges and parries share one chain); a dodge or parry during a Witch Time does nothing.
 - **PlayerFullSpeed** (on by default): the pawn's `CustomTimeDilation` = the game's value x 1 / `WorldSpeed` during a
@@ -44,7 +52,7 @@ how to install it are in [openmods.md](openmods.md), the mod page on [openmods](
   game writes the player's factor every frame through the Blueprint event
   `BP_RenewalPlayer_C:SetCustomTimeDilation` (`/Game/RenewalContent/Prototypes/Character/BP_RenewalPlayer`; its own
   per-actor slow-downs such as hit-stop, 1.0 otherwise). A hook on it (set only with `PlayerFullSpeed = true`)
-  multiplies each value right after the game wrote it, only for the controlled pawn; the 16 ms loop checks the result
+  multiplies each value right after the game wrote it, only for the controlled pawn; the frame step checks the result
   and sets it again when the hook missed a write (in the game test of 1.4 it never did: about 110 writes per Witch
   Time, all multiplied). At the end, and at a map load, the pawn gets the game's last value back.
 - **LogTime:** logs each dodge event, each red-light perfect dodge, each Witch Time and its real length, the game's

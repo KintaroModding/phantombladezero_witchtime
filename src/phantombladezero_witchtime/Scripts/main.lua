@@ -35,7 +35,8 @@
 -- The hooks need the Blueprint classes, which the game loads with the player's abilities: the mod looks for them at
 -- start, after each map load and every CHECK_INTERVAL_MS while one is missing, and keeps what it found (a search by
 -- name costs a few milliseconds; searches on a timer made another game stutter). LogTime logs each dodge, parry and
--- Witch Time, the game's own slow-downs and the changes of the time factors, for tests.
+-- Witch Time, the game's own slow-downs and the changes of the time factors, for tests. All loops run on the game
+-- thread (1.8; see the end of the file).
 --
 -- Settings: the player edits Scripts\config.lua; DEFAULTS holds every setting with its default. A player (or a mod
 -- manager) keeps their config.lua across updates, so a new main.lua can meet an older file: a setting that the file
@@ -45,9 +46,10 @@
 local UEHelpers = require("UEHelpers")
 
 local MOD_NAME = "Witch Time"
-local VERSION = "1.7"
+local VERSION = "1.8"
 local CHECK_INTERVAL_MS = 2000
--- How often a running Witch Time checks the world speed and its end.
+-- How often a running Witch Time checks the world speed and its end when UE4SS has no engine tick hook (else: every
+-- frame).
 local FRAME_MS = 16
 -- After a Witch Time ends, changes of the world speed are still logged this long (real seconds; LogTime).
 local WATCH_AFTER_SECONDS = 0.5
@@ -675,30 +677,52 @@ if not started then
     LogError("Error at start: " .. tostring(problem))
 end
 
-LoopAsync(CHECK_INTERVAL_MS, function()
-    ExecuteInGameThread(function()
-        local ok, err = pcall(Tick)
-        if not ok then
-            LogError("Error: " .. tostring(err))
-        end
-    end)
-    -- false keeps the loop running.
-    return false
-end)
-
--- The fast loop does nothing while no Witch Time runs and no end is watched.
-LoopAsync(FRAME_MS, function()
-    if active or Now() < watchUntil then
-        ExecuteInGameThread(function()
-            local ok, err = pcall(Frame)
-            if not ok then
-                LogError("Error: " .. tostring(err))
-                if active then
-                    -- Never leave the game slow: end it, and if even that fails, the safety check ends it.
-                    pcall(EndWitchTime, "error")
-                end
-            end
-        end)
+local function CheckStep()
+    local ok, err = pcall(Tick)
+    if not ok then
+        LogError("Error: " .. tostring(err))
     end
-    return false
-end)
+end
+
+-- The fast step does nothing while no Witch Time runs and no end is watched.
+local function FrameStep()
+    if not (active or Now() < watchUntil) then
+        return
+    end
+    local ok, err = pcall(Frame)
+    if not ok then
+        LogError("Error: " .. tostring(err))
+        if active then
+            -- Never leave the game slow: end it, and if even that fails, the safety check ends it.
+            pcall(EndWitchTime, "error")
+        end
+    end
+end
+
+-- Both loops run on the game thread (UE4SS's Delayed Action API), the same thread as the hooks: 1.7 used LoopAsync,
+-- whose callback runs on a second thread in the same Lua state, and a player's crash report showed a damaged state
+-- (2026-10-30: "attempt to compare number with function" on a line that compares two numbers, then UE4SS's "Ref was
+-- not function"). The fast step runs once per frame when UE4SS has its engine tick hook (EngineTickAvailable), else
+-- every FRAME_MS. A UE4SS without the Delayed Action API gets the old LoopAsync loops, and the log says so.
+if type(LoopInGameThreadWithDelay) == "function" then
+    LoopInGameThreadWithDelay(CHECK_INTERVAL_MS, CheckStep)
+    if EngineTickAvailable == true and type(LoopInGameThreadAfterFrames) == "function" then
+        LoopInGameThreadAfterFrames(1, FrameStep)
+    else
+        LoopInGameThreadWithDelay(FRAME_MS, FrameStep)
+    end
+else
+    Log("This UE4SS has no game-thread loops (LoopInGameThreadWithDelay): the older LoopAsync is used; a newer UE4SS "
+        .. "is safer.")
+    LoopAsync(CHECK_INTERVAL_MS, function()
+        ExecuteInGameThread(CheckStep)
+        -- false keeps the loop running.
+        return false
+    end)
+    LoopAsync(FRAME_MS, function()
+        if active or Now() < watchUntil then
+            ExecuteInGameThread(FrameStep)
+        end
+        return false
+    end)
+end

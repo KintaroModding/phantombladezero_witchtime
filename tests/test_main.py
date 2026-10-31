@@ -1,7 +1,8 @@
 """Offline test of Scripts/main.lua with lupa (Lua 5.4) and small mocks of UE4SS and the game.
 
-The mocks stand in for the UE4SS functions that the script uses (LoopAsync, RegisterHook, RegisterLoadMapPostHook,
-StaticFindObject, UEHelpers) and for the game: a clock (os.clock), the world settings with the two time factors
+The mocks stand in for the UE4SS functions that the script uses (the game-thread loops LoopInGameThreadWithDelay and
+LoopInGameThreadAfterFrames, the old LoopAsync, RegisterHook, RegisterLoadMapPostHook, StaticFindObject, UEHelpers)
+and for the game: a clock (os.clock), the world settings with the two time factors
 (DemoPlayTimeDilation for the mod, TimeDilation for the game), the player controller and pawn, and the Blueprint
 classes that the game loads later. The Witch Time checks fire the hooked
 functions like the game does and move the clock.
@@ -95,7 +96,14 @@ MAP_HOOKS = {}
 function RegisterLoadMapPostHook(callback) MAP_HOOKS[#MAP_HOOKS + 1] = callback end
 
 LOOPS = {}
-function LoopAsync(ms, callback) LOOPS[#LOOPS + 1] = callback end
+-- The game-thread loops of UE4SS's Delayed Action API (1.8), and the old LoopAsync for a UE4SS without them.
+ASYNC_LOOPS = 0
+function LoopAsync(ms, callback) ASYNC_LOOPS = ASYNC_LOOPS + 1 LOOPS[#LOOPS + 1] = callback end
+DELAYS = {}
+FRAMES = {}
+EngineTickAvailable = true
+function LoopInGameThreadWithDelay(ms, callback) DELAYS[#DELAYS + 1] = ms LOOPS[#LOOPS + 1] = callback return #LOOPS end
+function LoopInGameThreadAfterFrames(n, callback) FRAMES[#FRAMES + 1] = n LOOPS[#LOOPS + 1] = callback return #LOOPS end
 function ExecuteInGameThread(callback) callback() end
 
 local function Invalid() return OBJECT({ valid = false }) end
@@ -166,11 +174,14 @@ def lua_path(path: Path) -> str:
     return "[[" + path.as_posix() + "]]"
 
 
-def run(config_folder: Path):
-    """Runs main.lua with require("config") reading config.lua in config_folder, and its timers three times. A Lua
-    error that stops main.lua becomes an "Error" line in the log, so the checks fail instead of the test."""
+def run(config_folder: Path, before: str = ""):
+    """Runs main.lua with require("config") reading config.lua in config_folder, and its timers three times; before is
+    Lua code that changes the mocks first (another UE4SS). A Lua error that stops main.lua becomes an "Error" line in
+    the log, so the checks fail instead of the test."""
     lua = lua54.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(MOCKS)
+    if before:
+        lua.execute(before)
     lua.execute(f'package.path = {lua_path(config_folder)} .. "/?.lua"; package.cpath = ""')
     g = lua.globals()
     try:
@@ -205,7 +216,18 @@ def main() -> None:
     lua, g, log = run(CONFIG.parent)
     for line in log:
         print("      log: " + line)
-    check(len(g.LOOPS) == TIMERS, f"{TIMERS} LoopAsync timers")
+    check(len(g.LOOPS) == TIMERS, f"{TIMERS} timers")
+    check(g.ASYNC_LOOPS == 0 and list(g.DELAYS.values()) == [2000] and list(g.FRAMES.values()) == [1],
+          "both loops on the game thread (1.8): the 2 s check with LoopInGameThreadWithDelay, the fast step every "
+          "frame with LoopInGameThreadAfterFrames; no LoopAsync")
+    _, g_tick, _ = run(CONFIG.parent, "EngineTickAvailable = false")
+    check(g_tick.ASYNC_LOOPS == 0 and list(g_tick.DELAYS.values()) == [2000, 16] and len(g_tick.FRAMES) == 0,
+          "without the engine tick hook the fast step runs every 16 ms, still on the game thread")
+    _, g_old, log_old = run(CONFIG.parent, "LoopInGameThreadWithDelay = nil LoopInGameThreadAfterFrames = nil")
+    check(g_old.ASYNC_LOOPS == 2 and len(g_old.LOOPS) == TIMERS
+          and any("no game-thread loops" in line for line in log_old)
+          and not any("Error" in line for line in log_old),
+          "a UE4SS without the Delayed Action API gets the old LoopAsync loops; the log says so")
     check(len(g.MAP_HOOKS) == 1, "one map load hook")
     check(any(f"{version} loaded." in line for line in log), f"load line with the version {version} of mod.json")
     check(not any("Error" in line for line in log), "no error line after three timer runs")
