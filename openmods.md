@@ -63,10 +63,13 @@ a value, save, and start the game again. `UE4SS.log` shows the settings in use i
 
 ## Compatibility
 
-- Game version: Release (Steam build 26266538) (`CL-301524_JKS-17219`).
-- Tested with UE4SS `v3.0.1-1183-gcdbc0b66`.
+- Game version: Steam build 26367565 (`CL-302256_JKS-17280`).
+- Tested with UE4SS `v4.0.0` (1.8 first with `v3.0.1-1183-gcdbc0b66` on the game's first release).
 - Other mods that change the speed of the whole game work on top of it, unless they use the same time factor as this
   mod (the replay factor `DemoPlayTimeDilation`); then this mod sets its own value again during a Witch Time.
+  [Reaction Slow-Mo](https://github.com/KintaroModding/phantombladezero_reactionslowmo) uses that factor before enemy
+  attacks and gives way to this mod: it starts no slow-down during a Witch Time, and a Witch Time takes over its
+  slow-down. Not tested together yet.
 
 ## Known issues
 

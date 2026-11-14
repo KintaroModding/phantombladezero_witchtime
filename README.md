@@ -3,7 +3,8 @@
 A dodge through an enemy attack, or a timed parry, slows the whole world down for a moment, like Witch Time.
 
 A [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) Lua mod for Phantom Blade Zero (Unreal Engine 5.7), made with
-game version `CL-301524_JKS-17219` and UE4SS `v3.0.1-1183-gcdbc0b66`. This README is for developers; what the mod does and
+game version `CL-301524_JKS-17219` and UE4SS `v3.0.1-1183-gcdbc0b66`, played in game with `CL-302256_JKS-17280`
+(Steam build 26367565) and UE4SS `v4.0.0` (1.8). This README is for developers; what the mod does and
 how to install it are in [openmods.md](openmods.md), the mod page on [openmods](https://openmods.nexus).
 
 ## How it works
