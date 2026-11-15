@@ -23,7 +23,7 @@ It is a UE4SS script; it changes no game file. All values are settings.
 
 ## Screenshots
 
-![Witch Time](docs/cover.png)
+![Witch Time](docs/cover.webp)
 
 ## How to install
 

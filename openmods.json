@@ -7,5 +7,5 @@
   "tags": ["gameplay"],
   "requires": ["UE4SS (tested with v4.0.0)"],
   "gameVersions": ["Steam build 26367565"],
-  "cover": "docs/cover.png"
+  "cover": "docs/cover.webp"
 }
